@@ -126,14 +126,15 @@ return d;
 }
 
 
-
-
-
 var margin = {top: 60, right: 20, bottom: 30, left: 50},
     width = 700 - margin.left - margin.right,
     height = 365 - margin.top - margin.bottom;
 
-var parseDate = d3.timeParse("%b %Y");
+// Adjust parsing of data to properly show tooltip
+var parseDate = d3.timeParse("%b %Y"),
+    bisectDate = d3.bisector(function(d) { return d.date; }).left,
+    formatValue = d3.format(".2"),
+    formatCurrency = function(d) { return formatValue(d) + "%"; };
 
 var x = d3.scaleTime()
   .range([0, width]);
@@ -183,32 +184,53 @@ d3.csv("data.csv", function(error, data) {
       .style("text-anchor", "end")
       .text("Unemployment Rate (%)");
 
-  // Start Animation on Click
   d3.select("#start").on("click", function() {
     var path = svg.append("path")
         .datum(data)
         .attr("class", "line")
         .attr("d", line);
 
-    // Variable to Hold Total Length
     var totalLength = path.node().getTotalLength();
 
-    // Set Properties of Dash Array and Dash Offset and initiate Transition
     path
       .attr("stroke-dasharray", totalLength + " " + totalLength)
       .attr("stroke-dashoffset", totalLength)
-     .transition() // Call Transition Method
-      .duration(4000) // Set Duration timing (ms)
-      .ease(d3.easeLinear) // Set Easing option
-      .attr("stroke-dashoffset", 0); // Set final value of dash-offset for transition
-  });
+     .transition() 
+      .duration(4000) 
+      .ease(d3.easeLinear) 
+      .attr("stroke-dashoffset", 0); 
 
-  // Reset Animation
+    var focus = svg.append("g")
+        .attr("class", "focus")
+        .style("display", "none");
+
+    focus.append("circle")
+        .attr("r", 4.5);
+
+    focus.append("text")
+        .attr("x", 9)
+        .attr("dy", ".35em");
+
+    svg.append("rect")
+        .attr("class", "overlay")
+        .attr("width", width)
+        .attr("height", height)
+        .on("mouseover", function() { focus.style("display", null); })
+        .on("mouseout", function() { focus.style("display", "none"); })
+        .on("mousemove", mousemove);
+
+    function mousemove() {
+      var x0 = x.invert(d3.mouse(this)[0]),
+          i = bisectDate(data, x0, 1),
+          d0 = data[i - 1],
+          d1 = data[i],
+          d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+      focus.attr("transform", "translate(" + x(d.date) + "," + y(d.rate) + ")");
+      focus.select("text").text(formatCurrency(d.rate));
+    }
+  });
   d3.select("#reset").on("click", function() {
     d3.select(".line").remove();
   });
-
 });
-
-
 
